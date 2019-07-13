@@ -7,6 +7,7 @@ import java.util.Scanner;
 
 public class Main {
     private static ObjectOutputStream objectOutputStream;
+    static readMessageThread messageReader;
 
     public static void main(String[] args) {
         String login = args[0];
@@ -14,7 +15,9 @@ public class Main {
         try {
             Socket Client = new Socket("localhost", 10000);
             try {
-                new readMessageThread(Client);
+                messageReader = new readMessageThread(Client);
+                messageReader.start();
+
                 while (true) {
                     String tt = scanner.nextLine();
                     Message msg = new Message(login, tt);
