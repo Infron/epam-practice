@@ -14,7 +14,7 @@ public class Server {
     private static Socket ClientSocket;
 
     public static ArrayList<userThread> userThreadList;
-
+    private static ObjectInputStream objectInputStream;
     public static void main(String[] args) throws IOException {
         System.out.println("Server starts!");
         ServerSocket Server = new ServerSocket(10000);
@@ -24,8 +24,9 @@ public class Server {
             try {
                 while (true) {
                     ClientSocket = Server.accept();
+                    objectInputStream = new ObjectInputStream(ClientSocket.getInputStream());
                     System.out.println("User connected");
-                    userThreadList.add(new userThread((ClientSocket)));
+                    userThreadList.add(new userThread(ClientSocket, objectInputStream));
                 }
             } catch (IOException e){
                 ClientSocket.close();
@@ -35,7 +36,7 @@ public class Server {
         }
     }
 }
-
+/*
 class Message implements Serializable {
     String login;
     String msg;
@@ -44,30 +45,32 @@ class Message implements Serializable {
         this.login = log;
         this.msg = mes;
     }
-}
+}*/
 
 class userThread extends Thread{
     private Socket ClientSocket;
-    private ObjectInputStream objectInputStream;
+
     private ObjectOutputStream objectOutputStream;
+    private ObjectInputStream objectInputStream;
 
-    userThread(Socket socket) throws IOException {
+    userThread(Socket socket, ObjectInputStream in) throws IOException {
         this.ClientSocket = socket;
-
+        this.objectInputStream = in;
         start();
     }
 
     public void run(){
         try{
             while (true){
-                objectInputStream = new ObjectInputStream(ClientSocket.getInputStream());
+
                 objectOutputStream = new ObjectOutputStream(ClientSocket.getOutputStream());
                 Message newMessage = (Message) objectInputStream.readObject();
                 if (newMessage.msg.equals("mamka")) break;
 
-                    for (int i = 0; i < Server.userThreadList.size(); i++) {
-                        Server.userThreadList.get(i).sendMessage(newMessage);
-                    }
+                for (userThread i : Server.userThreadList) {
+                    i.sendMessage(newMessage);
+                }
+                //objectOutputStream.close();
             }
         } catch (Exception e) {
             System.err.println(e);
@@ -76,8 +79,8 @@ class userThread extends Thread{
 
     private void sendMessage(Message msg) {
         try{
-                objectOutputStream.writeObject(msg);
-                objectOutputStream.flush();
+            objectOutputStream.writeObject(msg);
+            //objectOutputStream.flush();
         } catch (IOException e){
             System.err.println(e);
         }
