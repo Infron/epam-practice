@@ -11,13 +11,10 @@ import java.net.Socket;
 import java.util.Scanner;
 
 
-public class Main {
+public class Client {
 
     static ObjectMapper mapper = new ObjectMapper();
-
-
     private static OutputStream outputmsg;
-
     private static readMessageThread messageReader;
 
     public static void main(String[] args) throws IOException {
@@ -34,22 +31,31 @@ public class Main {
         mapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
 
         Scanner scanner = new Scanner(System.in);
-
-        System.out.println("Enter your name.");
-        String login = scanner.nextLine();
-        System.out.println("Hi, " + login + "! Enter your message.");
-
-
-
-
+        String login;
 
         try {
 
             Socket ClientSocket = new Socket("localhost", 10001);
 
             outputmsg = ClientSocket.getOutputStream();
-
             try {
+                System.out.println("Enter your name: ");
+
+                while (true) {
+                    String newLog = scanner.nextLine();
+                    mapper.writeValue(outputmsg, newLog);
+                    outputmsg.flush();
+
+                    InputStream inputmsg = ClientSocket.getInputStream();
+                    if (mapper.readValue(inputmsg, String.class).equals("no")) {
+                        System.out.println("Данное имя уже занято, пожалуйста, выберите другое!");
+                    } else {
+                        login = newLog;
+                        System.out.println("Добро пожаловать, " + login);
+                        break;
+                    }
+                }
+
                 messageReader = new readMessageThread(ClientSocket);
 
                 while (true) {
@@ -66,7 +72,6 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 }
 
@@ -81,22 +86,15 @@ class readMessageThread extends Thread {
     @Override
     public void run() {
         try {
-
             InputStream inputmsg = socket.getInputStream();
-
             while (true) {
-
-
                 Message newMessage;
-
-                newMessage = Main.mapper.readValue(inputmsg, Message.class);
-
+                newMessage = Client.mapper.readValue(inputmsg, Message.class);
                 System.out.println(newMessage.login + ":  " + newMessage.text);
 
                 if (newMessage.login.equals("mamka")) {
                     return;
                 }
-
             }
         } catch (Exception e) {
             e.printStackTrace();
