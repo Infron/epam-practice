@@ -11,24 +11,21 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.LinkedList;
 
 public class Server {
 
-    static LinkedList<userThread> userThreadList = new LinkedList<>();
-    static LinkedList<String> userLoginsList = new LinkedList<>();
-    static ObjectMapper mapper = new ObjectMapper();
-
     public static void main(String[] args) {
 
-        mapper.setVisibilityChecker(mapper.getSerializationConfig().getDefaultVisibilityChecker()
+        userThread.mapper.setVisibilityChecker(userThread.mapper.getSerializationConfig().getDefaultVisibilityChecker()
                 .withFieldVisibility(JsonAutoDetect.Visibility.ANY)
                 .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withCreatorVisibility(JsonAutoDetect.Visibility.NONE));
 
-        mapper.disable(JsonParser.Feature.AUTO_CLOSE_SOURCE);
-        mapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+        userThread.mapper.disable(JsonParser.Feature.AUTO_CLOSE_SOURCE);
+        userThread.mapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
 
 
         try (ServerSocket server = new ServerSocket(10001)) {
@@ -39,7 +36,8 @@ public class Server {
                 Socket clientSocket = server.accept();
                 System.out.println("User connected" + clientSocket);
                 try {
-                    userThreadList.add(new userThread(clientSocket));
+                    userThread.userThreadList.add(new userThread(clientSocket));
+                    userThread.userThreadList.getLast().start();
                 } catch (IOException e) {
                     e.printStackTrace();
                     clientSocket.close();
@@ -54,58 +52,46 @@ public class Server {
 
 
 class userThread extends Thread {
+    static LinkedList<userThread> userThreadList = new LinkedList<>();
+    static ObjectMapper mapper = new ObjectMapper();
+    private static LinkedList<String> userLoginsList = new LinkedList<>();
     private Socket ClientSocket;
     private OutputStream outputmsg;
 
     userThread(Socket socket) throws IOException {
         ClientSocket = socket;
         outputmsg = ClientSocket.getOutputStream();
-        start();
     }
+
 
     public void run() {
         try {
-            boolean flag = true;
-            boolean flaggg = true;
-            String str;
-
-            while (flag) {
-                InputStream inputmsg = ClientSocket.getInputStream();
-                String newLogin = Server.mapper.readValue(inputmsg, String.class);
-                if (!Server.userLoginsList.isEmpty())
-                {
-                    for (String ss : Server.userLoginsList)
-                        if (ss.equals(newLogin)) {
-                            flaggg = false;
-                            break;
-                        }
-
-                    if (!flaggg) {
-                        Server.mapper.writeValue(outputmsg, str = "no");
-                        outputmsg.flush();
-                    } else {
-                        Server.userLoginsList.add(newLogin);
-                        Server.mapper.writeValue(outputmsg, str = "yes");
-                        outputmsg.flush();
-                        flag = false;
-                    }
-                } else {
-                    Server.userLoginsList.add(newLogin);
-                    str = "yes";
-                    Server.mapper.writeValue(outputmsg, str);
+            InputStream inputmsg = ClientSocket.getInputStream();
+            while (true) {
+                String newLogin = mapper.readValue(inputmsg, String.class);
+                if (userLoginsList.contains(newLogin)) {
+                    mapper.writeValue(outputmsg, "no");
                     outputmsg.flush();
-                    flag = false;
+                } else {
+                    userLoginsList.add(newLogin);
+                    mapper.writeValue(outputmsg, "yes");
+                    outputmsg.flush();
+                    break;
                 }
-                flaggg = true;
             }
 
+
             while (true) {
-                InputStream inputmsg = ClientSocket.getInputStream();
                 outputmsg = ClientSocket.getOutputStream();
-                Message newMessage = Server.mapper.readValue(inputmsg, Message.class);
+                Message newMessage;
+                try {
+                    newMessage = mapper.readValue(inputmsg, Message.class);
+                } catch (Exception e) {
+                    break;
+                }
                 System.out.println(newMessage.login + ":  " + newMessage.text);
 
-                for (userThread userThread : Server.userThreadList) {
+                for (var userThread : userThreadList) {
                     userThread.sendMessage(newMessage);
                 }
             }
@@ -116,10 +102,15 @@ class userThread extends Thread {
 
     private void sendMessage(Message msg) {
         try {
-            Server.mapper.writeValue(outputmsg, msg);
+            mapper.writeValue(outputmsg, msg);
             outputmsg.flush();
+        } catch (SocketException e) {
+            int i = userThreadList.indexOf(this);
+            userThreadList.remove(i);
+            userLoginsList.remove(i);
         } catch (IOException e) {
             e.printStackTrace();
+
         }
     }
 }

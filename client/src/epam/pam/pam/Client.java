@@ -4,10 +4,14 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import epam.pam.pam.Common.Message;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.Scanner;
 
 
@@ -48,10 +52,10 @@ public class Client {
 
                     InputStream inputmsg = ClientSocket.getInputStream();
                     if (mapper.readValue(inputmsg, String.class).equals("no")) {
-                        System.out.println("Данное имя уже занято, пожалуйста, выберите другое!");
+                        System.out.println("Choose another name");
                     } else {
                         login = newLog;
-                        System.out.println("Добро пожаловать, " + login);
+                        System.out.println("Welcome, " + login);
                         break;
                     }
                 }
@@ -63,8 +67,12 @@ public class Client {
                     Message msg = new Message();
                     msg.login = login;
                     msg.text = text;
-                    mapper.writeValue(outputmsg, msg);
-                    outputmsg.flush();
+                    try {
+                        mapper.writeValue(outputmsg, msg);
+                        outputmsg.flush();
+                    } catch (SocketException e) {
+                        break;
+                    }
                 }
             } finally {
                 outputmsg.close();
@@ -89,12 +97,13 @@ class readMessageThread extends Thread {
             InputStream inputmsg = socket.getInputStream();
             while (true) {
                 Message newMessage;
-                newMessage = Client.mapper.readValue(inputmsg, Message.class);
-                System.out.println(newMessage.login + ":  " + newMessage.text);
-
-                if (newMessage.login.equals("mamka")) {
-                    return;
+                try {
+                    newMessage = Client.mapper.readValue(inputmsg, Message.class);
+                    System.out.println(newMessage.login + ":  " + newMessage.text);
+                } catch (MismatchedInputException e) {
+                    break;
                 }
+
             }
         } catch (Exception e) {
             e.printStackTrace();
