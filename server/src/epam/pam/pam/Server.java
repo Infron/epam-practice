@@ -12,7 +12,9 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Collections;
 import java.util.LinkedList;
+import java.util.List;
 
 public class Server {
 
@@ -37,7 +39,7 @@ public class Server {
                 System.out.println("User connected" + clientSocket);
                 try {
                     userThread.userThreadList.add(new userThread(clientSocket));
-                    userThread.userThreadList.getLast().start();
+                    userThread.userThreadList.get(userThread.userThreadList.size()-1).start();
                 } catch (IOException e) {
                     e.printStackTrace();
                     clientSocket.close();
@@ -52,7 +54,8 @@ public class Server {
 
 
 class userThread extends Thread {
-    static LinkedList<userThread> userThreadList = new LinkedList<>();
+    static List<userThread> userThreadList = Collections.synchronizedList(new LinkedList<>());
+    //static LinkedList<userThread> userThreadList = new LinkedList<>();
     static ObjectMapper mapper = new ObjectMapper();
     private static LinkedList<String> userLoginsList = new LinkedList<>();
     private Socket ClientSocket;
@@ -90,9 +93,10 @@ class userThread extends Thread {
                     break;
                 }
                 System.out.println(newMessage.login + ":  " + newMessage.text);
-
-                for (var userThread : userThreadList) {
-                    userThread.sendMessage(newMessage);
+                synchronized (userThreadList) {
+                    for (int i = 0; i < userThreadList.size(); i++) {
+                        userThreadList.get(i).sendMessage(newMessage);
+                    }
                 }
             }
         } catch (Exception e) {
